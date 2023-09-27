@@ -4,6 +4,37 @@
   
   
   <entry>
+    <title>keepalived保证nginx高可用</title>
+    <link href="/2023/09/27/keepalived+nginx/"/>
+    <url>/2023/09/27/keepalived+nginx/</url>
+    
+    <content type="html"><![CDATA[<h2 id="MASTER配置"><a href="#MASTER配置" class="headerlink" title="MASTER配置"></a>MASTER配置</h2><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><code class="hljs bash">global_defs &#123;<br>    router_id LVS_1<br>    script_user root<br>    enable_script_security<br>&#125;<br>vrrp_script chk_nginx &#123;<br>    script <span class="hljs-string">&quot;/usr/bin/killall -0 nginx&quot;</span><br>    interval 2<br>    weight -30<br>&#125;<br><br>vrrp_instance VI_1 &#123;<br>    state MASTER<br>    interface ens18<br>    virtual_router_id 1<br>    priority 100<br>    advert_int 1<br><br>    virtual_ipaddress&#123;<br>        172.16.68.3/24 dev ens18<br>    &#125;<br>    authentication &#123;<br>        auth_type PASS<br>        auth_pass 123456<br>    &#125;<br><br>    track_script &#123;<br>        chk_nginx<br>    &#125;<br><br>&#125;<br></code></pre></td></tr></table></figure><p>vrrp_instance段中参数说明：</p><ul><li>vrrp_instance VI_1：设置keepalive虚拟路由器VRRP的名称</li><li>state MASTER：设置为MASTER，将其他keepalive均设置为BACKUP</li><li>interface ens33：设置VIP地址的网卡名称为ens33</li><li>virtual_route_id 51：设置keepalive的id，全局唯一</li><li>priority 100：设置优先级为100</li><li>virtual_ipaddress：设置VIP地址</li><li>authentication：访问keepalive服务的鉴权信息</li><li>track_script：HAProxy健康检查脚本</li></ul><h2 id="主备配置差异"><a href="#主备配置差异" class="headerlink" title="主备配置差异"></a>主备配置差异</h2><ul><li>router_id</li><li>state BACKUP，这是因为在整个keepalive集群中只能存在一个MASTER，如果keepalived集群不止2实例，那么其他都应该被设置为BACKUP</li></ul><h2 id="BACKUP配置"><a href="#BACKUP配置" class="headerlink" title="BACKUP配置"></a>BACKUP配置</h2><figure class="highlight yml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><code class="hljs yml"><span class="hljs-string">global_defs</span> &#123;<br>    <span class="hljs-string">router_id</span> <span class="hljs-string">LVS_2</span><br>    <span class="hljs-string">script_user</span> <span class="hljs-string">root</span><br>    <span class="hljs-string">enable_script_security</span> <br>&#125;<br><span class="hljs-string">vrrp_script</span> <span class="hljs-string">chk_nginx</span> &#123;<br>    <span class="hljs-string">script</span> <span class="hljs-string">&quot;/usr/bin/killall -0 nginx&quot;</span><br>    <span class="hljs-string">interval</span> <span class="hljs-number">2</span><br>    <span class="hljs-string">weight</span> <span class="hljs-number">-30</span><br>&#125;<br><br><span class="hljs-string">vrrp_instance</span> <span class="hljs-string">VI_1</span> &#123;<br>    <span class="hljs-string">state</span> <span class="hljs-string">BACKUP</span><br>    <span class="hljs-string">interface</span> <span class="hljs-string">ens18</span><br>    <span class="hljs-string">virtual_router_id</span> <span class="hljs-number">1</span><br>    <span class="hljs-string">priority</span> <span class="hljs-number">100</span><br>    <span class="hljs-string">advert_int</span> <span class="hljs-number">1</span><br>    <br>    <span class="hljs-string">virtual_ipaddress</span>&#123;<br>        <span class="hljs-number">172.16</span><span class="hljs-number">.68</span><span class="hljs-number">.3</span><span class="hljs-string">/24</span> <span class="hljs-string">dev</span> <span class="hljs-string">ens18</span>     <br>    &#125;<br>    <span class="hljs-string">authentication</span> &#123;<br>        <span class="hljs-string">auth_type</span> <span class="hljs-string">PASS</span><br>        <span class="hljs-string">auth_pass</span> <span class="hljs-number">123456</span><br>    &#125;<br>    <br>    <span class="hljs-string">track_script</span> &#123;<br>        <span class="hljs-string">chk_nginx</span><br>    &#125;<br><br>&#125;<br></code></pre></td></tr></table></figure>]]></content>
+    
+    
+    <categories>
+      
+      <category>linux</category>
+      
+      <category>keepalived</category>
+      
+    </categories>
+    
+    
+    <tags>
+      
+      <tag>keepalived</tag>
+      
+      <tag>Linux</tag>
+      
+      <tag>nginx</tag>
+      
+    </tags>
+    
+  </entry>
+  
+  
+  
+  <entry>
     <title>Hello World</title>
     <link href="/2023/09/27/hello-world/"/>
     <url>/2023/09/27/hello-world/</url>
