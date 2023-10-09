@@ -4,6 +4,35 @@
   
   
   <entry>
+    <title>熔断器日志分析</title>
+    <link href="/2023/10/09/breaker_es/"/>
+    <url>/2023/10/09/breaker_es/</url>
+    
+    <content type="html"><![CDATA[<p>原因：<a href="https://www.elastic.co/guide/en/elasticsearch/reference/current/circuit-breaker.html">https://www.elastic.co/guide/en/elasticsearch/reference/current/circuit-breaker.html</a></p><p>原因：<a href="https://www.elastic.co/guide/en/elasticsearch/reference/current/fix-common-cluster-issues.html#high-jvm-memory-pressure">https://www.elastic.co/guide/en/elasticsearch/reference/current/fix-common-cluster-issues.html#high-jvm-memory-pressure</a><br>Elasticsearch 官方熔断器</p><p>父熔断器（Parent circuit breaker）</p><p>父熔断器限制所有子熔断器上使用的内存总量，当触发父熔断器熔断时，可能的日志信息如下：</p><figure class="highlight stylus"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><code class="hljs stylus">Caused by: org<span class="hljs-selector-class">.elasticsearch</span><span class="hljs-selector-class">.common</span><span class="hljs-selector-class">.breaker</span><span class="hljs-selector-class">.CircuitBreakingException</span>: <span class="hljs-selector-attr">[parent]</span> Data too large, data <span class="hljs-keyword">for</span> <span class="hljs-selector-attr">[&lt;transport_request&gt;]</span> would be <span class="hljs-selector-attr">[1749436147/1.6gb]</span>, which is larger than the limit of <span class="hljs-selector-attr">[1622605824/1.5gb]</span>, real usage: <span class="hljs-selector-attr">[1749435872/1.6gb]</span>, new bytes reserved: <span class="hljs-selector-attr">[275/275b]</span><br>Field data 熔断器（Field data breaker）<br></code></pre></td></tr></table></figure><p>当对 text 字段聚合或排序时，会产生 Field data 数据结构。Field data 熔断器会预估有多少数据被加载到内存中。当预估的数据占用内存到达 Field data 熔断器阈值时，会触发 Field data 熔断器熔断。此时可能的日志信息如下：</p><figure class="highlight stylus"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs stylus">org<span class="hljs-selector-class">.elasticsearch</span><span class="hljs-selector-class">.common</span><span class="hljs-selector-class">.breaker</span><span class="hljs-selector-class">.CircuitBreakingException</span>: <span class="hljs-selector-attr">[fielddata]</span> Data too large, data <span class="hljs-keyword">for</span> <span class="hljs-selector-attr">[_id]</span> would be <span class="hljs-selector-attr">[943928680/900.2mb]</span>, which is larger than the limit of <span class="hljs-selector-attr">[255606128/243.7mb]</span><br></code></pre></td></tr></table></figure><p>In flight 请求熔断器（In flight requests circuit breaker）</p><p>In flight 请求熔断器限制了在 transport 和 HTTP 层的所有当前传入的请求所使用的内存。当触发 In flight 请求熔断器时，可能的日志信息如下：</p><figure class="highlight inform7"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><code class="hljs inform7"><span class="hljs-comment">[o.e.x.m.e.l.LocalExporter]</span> <span class="hljs-comment">[1611816935001404932]</span> unexpected error while indexing monitoring document<br>org.elasticsearch.xpack.monitoring.exporter.ExportException: RemoteTransportException<span class="hljs-comment">[<span class="hljs-comment">[1611816935001404732]</span><span class="hljs-comment">[9.10.153.16:9300]</span><span class="hljs-comment">[indices:data/write/bulk<span class="hljs-comment">[s]</span>]</span>]</span>; nested: CircuitBreakingException<span class="hljs-comment">[<span class="hljs-comment">[in_flight_requests]</span> Data too large, data for <span class="hljs-comment">[&lt;transport_request&gt;]</span> would be <span class="hljs-comment">[19491363612/18.1gb]</span>, which is larger than the limit of <span class="hljs-comment">[17066491904/15.8gb]</span>]</span>;<br></code></pre></td></tr></table></figure><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><code class="hljs bash">Caused by: org.elasticsearch.common.breaker.CircuitBreakingException: [parent] Data too large,<br> data <span class="hljs-keyword">for</span> [&lt;transport_request&gt;] would be [16333370524/15.2gb], <span class="hljs-comment"># A</span><br> <span class="hljs-built_in">which</span> is larger than the <span class="hljs-built_in">limit</span> of [16287753830/15.1gb], <span class="hljs-comment"># B</span><br> real usage: [16333368168/15.2gb], <span class="hljs-comment"># C</span><br> new bytes reserved: [2356/2.3kb], <span class="hljs-comment"># D</span><br> usages [request=0/0b, fielddata=0/0b, in_flight_requests=4476/4.3kb, accounting=7570257/7.2mb]<br></code></pre></td></tr></table></figure><p>这里有4个数值。</p><p>B处 的数值就是上限，超过这个就报错。（缺省是它是ES最大内存的95%），</p><p>C处 的数值是你的本机上ES进程已使用的内存大小，</p><p>D处 的数值2356就是你本次操作（或者说执行当前的任务）所需要内存，</p><p>C + D &#x3D; A &gt; B，所以报错了。</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs bash">[INFO ][o.e.m.j.JvmGcMonitorService] [node_1] [gc][number] overhead, spent [21s] collecting <span class="hljs-keyword">in</span> the last [40s]<br></code></pre></td></tr></table></figure><p>随着内存使用量的增加，垃圾收集变得更加频繁并且需要更长的时间。您可以在 elasticsearch.log.例如，以上事件表明 node_1 在过去 40秒中花费了超过 50%（21 秒）执行垃圾收集</p>]]></content>
+    
+    
+    <categories>
+      
+      <category>linux</category>
+      
+      <category>elasticsearch</category>
+      
+    </categories>
+    
+    
+    <tags>
+      
+      <tag>Linux</tag>
+      
+      <tag>elasticsearch</tag>
+      
+    </tags>
+    
+  </entry>
+  
+  
+  
+  <entry>
     <title>Ubuntu 18.04 部署 Elasticsearch 7.x 集群</title>
     <link href="/2023/10/08/install_es/"/>
     <url>/2023/10/08/install_es/</url>
