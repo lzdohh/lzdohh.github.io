@@ -24,7 +24,7 @@
 <meta property="og:description" content="日常运维">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2023-10-08T16:00:00.000Z">
-<meta property="article:modified_time" content="2023-10-09T03:51:15.467Z">
+<meta property="article:modified_time" content="2023-10-09T03:57:07.975Z">
 <meta property="article:author" content="lzd">
 <meta property="article:tag" content="Linux">
 <meta property="article:tag" content="elasticsearch">
@@ -274,12 +274,10 @@
             
               <div class="markdown-body">
                 
-                <p>原因：<a target="_blank" rel="noopener" href="https://www.elastic.co/guide/en/elasticsearch/reference/current/circuit-breaker.html">https://www.elastic.co/guide/en/elasticsearch/reference/current/circuit-breaker.html</a></p>
-<p>原因：<a target="_blank" rel="noopener" href="https://www.elastic.co/guide/en/elasticsearch/reference/current/fix-common-cluster-issues.html#high-jvm-memory-pressure">https://www.elastic.co/guide/en/elasticsearch/reference/current/fix-common-cluster-issues.html#high-jvm-memory-pressure</a><br>Elasticsearch 官方熔断器</p>
-<p>父熔断器（Parent circuit breaker）</p>
+                <p>Elasticsearch 官方熔断器<br>原因：<a target="_blank" rel="noopener" href="https://www.elastic.co/guide/en/elasticsearch/reference/current/circuit-breaker.html">https://www.elastic.co/guide/en/elasticsearch/reference/current/circuit-breaker.html</a><br>原因：<a target="_blank" rel="noopener" href="https://www.elastic.co/guide/en/elasticsearch/reference/current/fix-common-cluster-issues.html#high-jvm-memory-pressure">https://www.elastic.co/guide/en/elasticsearch/reference/current/fix-common-cluster-issues.html#high-jvm-memory-pressure</a><br>父熔断器（Parent circuit breaker）</p>
 <p>父熔断器限制所有子熔断器上使用的内存总量，当触发父熔断器熔断时，可能的日志信息如下：</p>
-<figure class="highlight stylus"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><code class="hljs stylus">Caused by: org<span class="hljs-selector-class">.elasticsearch</span><span class="hljs-selector-class">.common</span><span class="hljs-selector-class">.breaker</span><span class="hljs-selector-class">.CircuitBreakingException</span>: <span class="hljs-selector-attr">[parent]</span> Data too large, data <span class="hljs-keyword">for</span> <span class="hljs-selector-attr">[&lt;transport_request&gt;]</span> would be <span class="hljs-selector-attr">[1749436147/1.6gb]</span>, which is larger than the limit of <span class="hljs-selector-attr">[1622605824/1.5gb]</span>, real usage: <span class="hljs-selector-attr">[1749435872/1.6gb]</span>, new bytes reserved: <span class="hljs-selector-attr">[275/275b]</span><br>Field data 熔断器（Field data breaker）<br></code></pre></td></tr></table></figure>
-
+<figure class="highlight stylus"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs stylus">Caused by: org<span class="hljs-selector-class">.elasticsearch</span><span class="hljs-selector-class">.common</span><span class="hljs-selector-class">.breaker</span><span class="hljs-selector-class">.CircuitBreakingException</span>: <span class="hljs-selector-attr">[parent]</span> Data too large, data <span class="hljs-keyword">for</span> <span class="hljs-selector-attr">[&lt;transport_request&gt;]</span> would be <span class="hljs-selector-attr">[1749436147/1.6gb]</span>, which is larger than the limit of <span class="hljs-selector-attr">[1622605824/1.5gb]</span>, real usage: <span class="hljs-selector-attr">[1749435872/1.6gb]</span>, new bytes reserved: <span class="hljs-selector-attr">[275/275b]</span><br></code></pre></td></tr></table></figure>
+<p>Field data 熔断器（Field data breaker）</p>
 <p>当对 text 字段聚合或排序时，会产生 Field data 数据结构。Field data 熔断器会预估有多少数据被加载到内存中。当预估的数据占用内存到达 Field data 熔断器阈值时，会触发 Field data 熔断器熔断。此时可能的日志信息如下：</p>
 <figure class="highlight stylus"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><code class="hljs stylus">org<span class="hljs-selector-class">.elasticsearch</span><span class="hljs-selector-class">.common</span><span class="hljs-selector-class">.breaker</span><span class="hljs-selector-class">.CircuitBreakingException</span>: <span class="hljs-selector-attr">[fielddata]</span> Data too large, data <span class="hljs-keyword">for</span> <span class="hljs-selector-attr">[_id]</span> would be <span class="hljs-selector-attr">[943928680/900.2mb]</span>, which is larger than the limit of <span class="hljs-selector-attr">[255606128/243.7mb]</span><br></code></pre></td></tr></table></figure>
 
